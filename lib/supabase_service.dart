@@ -68,7 +68,7 @@ class AmlakSupabase {
     String dealType='فروش', String city='گرگان', String neighborhood='',
     String deposit='', String monthlyRent='', String bedrooms='', String buildingAge='',
     bool parking=false,bool elevator=false,bool storage=false,List<String> features=const [],
-    String sellerName='',String documentType='',String description='',String status='active',String commissionAmount='',String consultantShare='',String privateNote='',bool negotiable=false,
+    String sellerName='',String documentType='',String description='',String status='active',String commissionAmount='',String consultantShare='',bool negotiable=false,
   }) async {
     num? n(String s)=>num.tryParse(s.replaceAll(',','').trim());
     final values=<String,dynamic>{
@@ -77,12 +77,12 @@ class AmlakSupabase {
       'price':n(price),'deposit':n(deposit),'monthly_rent':n(monthlyRent),
       'bedrooms':int.tryParse(bedrooms),'building_age':int.tryParse(buildingAge),
       'parking':parking,'elevator':elevator,'storage':storage,'features':features,'phone':phone,
-      'seller_name':sellerName,'document_type':documentType,'description':description,'status':status,'commission_amount':n(commissionAmount),'consultant_share':n(consultantShare),'private_note':privateNote,'negotiable':negotiable,'assigned_to':uid,
+      'seller_name':sellerName,'document_type':documentType,'description':description,'status':status,'commission_amount':n(commissionAmount),'consultant_share':n(consultantShare),'negotiable':negotiable,
       'updated_at':DateTime.now().toUtc().toIso8601String(),
     };
     final Map<String,dynamic> saved;
     if(id==null) {
-      saved=Map<String,dynamic>.from(await client.from('properties').insert({...values,'owner_id':uid}).select().single());
+      saved=Map<String,dynamic>.from(await client.from('properties').insert({...values,'owner_id':uid,'assigned_to':uid}).select().single());
     } else {
       saved=Map<String,dynamic>.from(await client.from('properties').update(values).eq('id',id).select().single());
     }
@@ -114,6 +114,13 @@ class AmlakSupabase {
   static Future<void> deletePropertyImage(String imageId,String path) async {
     await client.storage.from(bucket).remove([path]);
     await client.from('property_images').delete().eq('id',imageId);
+  }
+  static Future<String> loadPrivateNote(String propertyId) async {
+    final row=await client.from('property_private_notes').select('note').eq('property_id',propertyId).maybeSingle();
+    return row?['note']?.toString()??'';
+  }
+  static Future<void> savePrivateNote(String propertyId,String note) async {
+    await client.from('property_private_notes').upsert({'property_id':propertyId,'note':note,'updated_at':DateTime.now().toUtc().toIso8601String()});
   }
   static Future<List<Map<String,dynamic>>> loadPropertyAccess(String propertyId) async =>
       List<Map<String,dynamic>>.from(await client.from('property_access').select().eq('property_id',propertyId));
