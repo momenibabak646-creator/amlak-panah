@@ -31,11 +31,11 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Run tests
         run: flutter test
-      - name: Build Android arm64 release APK
-        run: flutter build apk --release --target-platform android-arm64
+      - name: Build universal Android release APK
+        run: flutter build apk --release
       - name: Upload release-mode APK
         uses: actions/upload-artifact@v4
         with:
-          name: amlak-panah-arm64-release-candidate
+          name: amlak-panah-universal-release
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
