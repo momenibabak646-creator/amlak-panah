@@ -70,6 +70,11 @@ class PropertyOcrParser {
         else if (line.contains('فروش')) result['deal_type'] = 'فروش';
       }
     }
+    if (result.containsKey('deposit') && result.containsKey('monthly_rent')) {
+      result['deal_type'] = 'رهن و اجاره';
+    } else if (result.containsKey('deposit') && !result.containsKey('deal_type')) {
+      result['deal_type'] = 'رهن کامل';
+    }
     return result;
   }
 }
