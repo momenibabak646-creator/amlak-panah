@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:tesseract_ocr/tesseract_ocr.dart';
 import 'package:tesseract_ocr/ocr_engine_config.dart';
 import 'ocr_parser.dart';
+import 'brand_logo.dart';
 import 'supabase_service.dart';
 
 const gold = Color(0xFFB58A35);
@@ -244,4 +245,4 @@ class _TeamPageState extends State<TeamPage>{
 }
 
 class AppShell extends StatefulWidget{const AppShell({super.key});@override State<AppShell> createState()=>_AppShellState();}
-class _AppShellState extends State<AppShell>{int index=0;final pages=const [DashboardPage(),PropertiesPage(),CustomersPage(),FollowupsPage(),ReportsPage(),TeamPage()];@override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(AppPages.titles[index],style:const TextStyle(fontWeight:FontWeight.bold)),actions:[IconButton(tooltip:'خروج',onPressed:()=>Supabase.instance.client.auth.signOut(),icon:const Icon(Icons.logout))]),body:pages[index],bottomNavigationBar:NavigationBar(selectedIndex:index,onDestinationSelected:(v)=>setState(()=>index=v),destinations:List.generate(AppPages.titles.length,(i)=>NavigationDestination(icon:Icon(AppPages.icons[i]),label:AppPages.titles[i]))));}
+class _AppShellState extends State<AppShell>{int index=0;final pages=const [DashboardPage(),PropertiesPage(),CustomersPage(),FollowupsPage(),ReportsPage(),TeamPage()];@override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Row(children:[const BrandLogo(size:42),const SizedBox(width:8),Text(AppPages.titles[index],style:const TextStyle(fontWeight:FontWeight.bold))]),actions:[IconButton(tooltip:'خروج',onPressed:()=>Supabase.instance.client.auth.signOut(),icon:const Icon(Icons.logout))]),body:pages[index],bottomNavigationBar:NavigationBar(selectedIndex:index,onDestinationSelected:(v)=>setState(()=>index=v),destinations:List.generate(AppPages.titles.length,(i)=>NavigationDestination(icon:Icon(AppPages.icons[i]),label:AppPages.titles[i]))));}
