@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app_config.dart';
 import 'app_pages.dart';
+import 'brand_logo.dart';
 
 Future<void> main() async {
  WidgetsFlutterBinding.ensureInitialized();
@@ -31,7 +32,7 @@ class _SignInPageState extends State<SignInPage>{
  @override void dispose(){email.dispose();password.dispose();super.dispose();}
  Future<void> submit()async{setState(() { busy=true; error=null; });try{if(signup){await Supabase.instance.client.auth.signUp(email:email.text.trim(),password:password.text);}else{await Supabase.instance.client.auth.signInWithPassword(email:email.text.trim(),password:password.text);}}on AuthException catch(e){error=e.message;}catch(e){error=e.toString();}if(mounted)setState(()=>busy=false);}
  @override Widget build(BuildContext context)=>Scaffold(body:Center(child:SingleChildScrollView(padding:const EdgeInsets.all(24),child:ConstrainedBox(constraints:const BoxConstraints(maxWidth:420),child:Card(child:Padding(padding:const EdgeInsets.all(24),child:Column(mainAxisSize:MainAxisSize.min,children:[
- Container(width:132,height:132,decoration:const BoxDecoration(color:Color(0xFFFFB900),shape:BoxShape.circle),padding:const EdgeInsets.all(9),child:Container(decoration:const BoxDecoration(color:Colors.black,shape:BoxShape.circle),alignment:Alignment.center,child:const Text('املاک پناه',textAlign:TextAlign.center,style:TextStyle(color:Colors.white,fontSize:22,fontWeight:FontWeight.bold)))),const SizedBox(height:10),Text(signup?'ایجاد حساب کاربری':'ورود به حساب کاربری'),const SizedBox(height:18),
+ const BrandLogo(size:144),const SizedBox(height:10),Text(signup?'ایجاد حساب کاربری':'ورود به حساب کاربری'),const SizedBox(height:18),
  TextField(controller:email,keyboardType:TextInputType.emailAddress,decoration:const InputDecoration(labelText:'ایمیل',border:OutlineInputBorder())),const SizedBox(height:12),
  TextField(controller:password,obscureText:true,decoration:const InputDecoration(labelText:'رمز عبور',border:OutlineInputBorder())),
  if(error!=null)Padding(padding:const EdgeInsets.all(8),child:Text(error!,style:const TextStyle(color:Colors.red))),
