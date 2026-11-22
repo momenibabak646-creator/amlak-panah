@@ -22,3 +22,10 @@ void main() {
     expect(result['monthly_rent'], '12000000');
   });
 }
+
+  test('infers rent and deposit deal type across separate lines', () {
+    final result = PropertyOcrParser.parse('رهن: ۳۰۰,۰۰۰,۰۰۰\\nاجاره: ۱۲,۰۰۰,۰۰۰');
+    expect(result['deposit'], '300000000');
+    expect(result['monthly_rent'], '12000000');
+    expect(result['deal_type'], 'رهن و اجاره');
+  });
