@@ -54,3 +54,9 @@ begin
       using (bucket_id = 'property-images' and (storage.foldername(name))[1] = auth.uid()::text);
   end if;
 end $$;
+
+
+-- Image metadata extends the existing property_images table.
+alter table public.property_images add column if not exists property_id uuid references public.properties(id) on delete cascade, add column if not exists user_id uuid references auth.users(id) on delete cascade, add column if not exists storage_path text, add column if not exists created_at timestamptz default now();
+alter table public.property_images enable row level security;
+do $$ begin if not exists (select 1 from pg_policies where schemaname='public' and tablename='property_images' and policyname='Users manage own property images') then create policy "Users manage own property images" on public.property_images for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid()); end if; end $$;
