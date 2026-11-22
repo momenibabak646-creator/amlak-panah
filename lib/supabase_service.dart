@@ -68,7 +68,7 @@ class AmlakSupabase {
     String dealType='فروش', String city='گرگان', String neighborhood='',
     String deposit='', String monthlyRent='', String bedrooms='', String buildingAge='',
     bool parking=false,bool elevator=false,bool storage=false,List<String> features=const [],
-    String sellerName='',String documentType='',String description='',String status='active',
+    String sellerName='',String documentType='',String description='',String status='active',String commissionAmount='',String consultantShare='',String privateNote='',bool negotiable=false,
   }) async {
     num? n(String s)=>num.tryParse(s.replaceAll(',','').trim());
     final values=<String,dynamic>{
@@ -77,7 +77,7 @@ class AmlakSupabase {
       'price':n(price),'deposit':n(deposit),'monthly_rent':n(monthlyRent),
       'bedrooms':int.tryParse(bedrooms),'building_age':int.tryParse(buildingAge),
       'parking':parking,'elevator':elevator,'storage':storage,'features':features,'phone':phone,
-      'seller_name':sellerName,'document_type':documentType,'description':description,'status':status,
+      'seller_name':sellerName,'document_type':documentType,'description':description,'status':status,'commission_amount':n(commissionAmount),'consultant_share':n(consultantShare),'private_note':privateNote,'negotiable':negotiable,'assigned_to':uid,
       'updated_at':DateTime.now().toUtc().toIso8601String(),
     };
     final Map<String,dynamic> saved;
