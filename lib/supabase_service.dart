@@ -115,6 +115,8 @@ class AmlakSupabase {
     await client.storage.from(bucket).remove([path]);
     await client.from('property_images').delete().eq('id',imageId);
   }
+  static Future<List<Map<String,dynamic>>> loadPropertyAccess(String propertyId) async =>
+      List<Map<String,dynamic>>.from(await client.from('property_access').select().eq('property_id',propertyId));
   static Future<void> grantProperty(String propertyId,String userId) async {
     await client.from('property_access').insert({'property_id':propertyId,'user_id':userId,'granted_by':uid});
   }
