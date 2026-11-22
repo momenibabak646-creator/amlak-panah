@@ -21,6 +21,10 @@ jobs:
           channel: stable
       - name: Generate Android project files
         run: flutter create --platforms=android --project-name=amlak_panah .
+      - name: Download Persian OCR model
+        run: |
+          mkdir -p assets/tessdata
+          curl -fL --retry 3 https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/fas.traineddata -o assets/tessdata/fas.traineddata
       - name: Install dependencies
         run: flutter pub get
       - name: Analyze
