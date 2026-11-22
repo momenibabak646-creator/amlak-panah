@@ -2,6 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:tesseract_ocr/tesseract_ocr.dart';
+import 'package:tesseract_ocr/ocr_engine_config.dart';
+import 'ocr_parser.dart';
 import 'supabase_service.dart';
 
 const gold = Color(0xFFB58A35);
@@ -111,7 +114,51 @@ class PropertyForm extends StatefulWidget {
 class _PropertyFormState extends State<PropertyForm>{
  final keyForm=GlobalKey<FormState>();final picker=ImagePicker();final List<XFile> selectedImages=[];late final Map<String,TextEditingController> c;late String kind,deal,status;late bool parking,elevator,storage,negotiable; Set<String> features={};
  @override void initState(){super.initState();final p=widget.initial??{};c={for(final k in ['title','city','neighborhood','address','area','price','deposit','monthly_rent','bedrooms','building_age','phone','seller_name','document_type','description','commission_amount','consultant_share','private_note']) k:TextEditingController(text:p[k]?.toString()??(k=='city'?'گرگان':''))};kind=p['property_type']??kinds.first;deal=p['deal_type']??deals.first;status=p['status']??'active';parking=p['parking']==true;elevator=p['elevator']==true;storage=p['storage']==true;negotiable=p['negotiable']==true;features=Set<String>.from((p['features'] is List)?p['features']:[]);}
- @override void dispose(){for(final x in c.values){x.dispose();}super.dispose();}
+ Future<void> scanAndExtract() async {
+    try {
+      final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 92);
+      if (image == null) return;
+      if (mounted) setState(() { selectedImages.add(image); });
+      final extracted = await TesseractOcr.extractText(
+        image.path,
+        config: OCRConfig(language: 'fas', engine: OCREngine.tesseract),
+      );
+      if (!mounted) return;
+      if (extracted.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('متنی از تصویر خوانده نشد؛ تصویر واضح‌تری انتخاب کنید.')));
+        return;
+      }
+      final review = TextEditingController(text: extracted);
+      final apply = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('بازبینی متن استخراج‌شده'),
+          content: SizedBox(width: 480, child: TextField(
+            controller: review, minLines: 8, maxLines: 14,
+            decoration: const InputDecoration(labelText: 'متن خوانده‌شده؛ در صورت نیاز اصلاح کنید', border: OutlineInputBorder()),
+          )),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('رد کردن')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('استخراج و تکمیل فرم')),
+          ],
+        ),
+      );
+      if (apply == true && mounted) {
+        final parsed = PropertyOcrParser.parse(review.text);
+        for (final entry in parsed.entries) {
+          if (c.containsKey(entry.key) && entry.value.isNotEmpty) c[entry.key]!.text = entry.value;
+        }
+        if (parsed['property_type'] != null && kinds.contains(parsed['property_type'])) kind = parsed['property_type']!;
+        if (parsed['deal_type'] != null && deals.contains(parsed['deal_type'])) deal = parsed['deal_type']!;
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مقادیر استخراج‌شده در فرم قرار گرفتند؛ قبل از ذخیره همه را بازبینی کنید.')));
+      }
+      review.dispose();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('استخراج متن ناموفق بود: $e')));
+    }
+  }
+  @override void dispose(){for(final x in c.values){x.dispose();}super.dispose();}
  Widget field(String k,String label,{bool number=false,int lines=1})=>Padding(padding:const EdgeInsets.only(bottom:10),child:TextFormField(controller:c[k],maxLines:lines,keyboardType:number?TextInputType.number:TextInputType.text,decoration:InputDecoration(labelText:label,border:const OutlineInputBorder()),validator:k=='title'?(v)=>v==null||v.trim().isEmpty?'عنوان ملک الزامی است':null:null));
  @override Widget build(BuildContext context)=>AlertDialog(title:Text(widget.initial==null?'ثبت مشخصات کامل ملک':'ویرایش ملک'),content:SizedBox(width:480,child:Form(key:keyForm,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
   DropdownButtonFormField<String>(value:kind,decoration:const InputDecoration(labelText:'نوع ملک'),items:kinds.map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),onChanged:(v)=>setState(()=>kind=v??kind)),
@@ -120,6 +167,7 @@ class _PropertyFormState extends State<PropertyForm>{
   const Align(alignment:Alignment.centerRight,child:Text('امکانات ملک',style:TextStyle(fontWeight:FontWeight.bold))),...['بالکن','پکیج','کولر گازی','انباری اضافی','لابی','نگهبانی','استخر','سالن ورزشی','کابینت MDF','بازسازی‌شده'].map((f)=>CheckboxListTile(dense:true,contentPadding:EdgeInsets.zero,title:Text(f),value:features.contains(f),onChanged:(v)=>setState((){if(v==true){features.add(f);}else{features.remove(f);}}))),SwitchListTile(title:const Text('پارکینگ'),value:parking,onChanged:(v)=>setState(()=>parking=v)),SwitchListTile(title:const Text('آسانسور'),value:elevator,onChanged:(v)=>setState(()=>elevator=v)),SwitchListTile(title:const Text('انباری'),value:storage,onChanged:(v)=>setState(()=>storage=v)),
   field('seller_name','نام مالک'),field('phone','شماره تماس',number:true),field('document_type','نوع سند'),field('description','توضیحات و امکانات',lines:3),field('commission_amount','مبلغ کمیسیون (تومان)',number:true),field('consultant_share','سهم مشاور از کمیسیون (تومان)',number:true),SwitchListTile(title:const Text('قیمت قابل مذاکره است'),value:negotiable,onChanged:(v)=>setState(()=>negotiable=v)),field('private_note','یادداشت محرمانه دفتر',lines:2),
   Align(alignment:Alignment.centerRight,child:TextButton.icon(onPressed:()async{final files=await picker.pickMultiImage(imageQuality:82,maxWidth:1800);if(files.isNotEmpty)setState(()=>selectedImages.addAll(files));},icon:const Icon(Icons.add_photo_alternate),label:const Text('افزودن تصاویر ملک'))),
+  Align(alignment:Alignment.centerRight,child:TextButton.icon(onPressed:scanAndExtract,icon:const Icon(Icons.document_scanner_outlined),label:const Text('خواندن آگهی از تصویر و تکمیل فرم'))),
   if(selectedImages.isNotEmpty) Align(alignment:Alignment.centerRight,child:Text('${selectedImages.length} تصویر انتخاب شده است')),
   if(selectedImages.isNotEmpty) SizedBox(height:76,child:ListView(scrollDirection:Axis.horizontal,children:selectedImages.map((f)=>Padding(padding:const EdgeInsets.all(4),child:Image.file(File(f.path),width:76,height:76,fit:BoxFit.cover))).toList())),
   DropdownButtonFormField<String>(value:status,decoration:const InputDecoration(labelText:'وضعیت فایل'),items:const [DropdownMenuItem(value:'active',child:Text('فعال')),DropdownMenuItem(value:'sold',child:Text('فروخته‌شده')),DropdownMenuItem(value:'rented',child:Text('اجاره رفته')),DropdownMenuItem(value:'archived',child:Text('بایگانی'))],onChanged:(v)=>setState(()=>status=v??status)),
