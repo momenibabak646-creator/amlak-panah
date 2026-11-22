@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 import 'app_config.dart';
 import 'supabase_service.dart';
 
@@ -230,6 +231,7 @@ class _PropertyHomePageState extends State<PropertyHomePage> {
     final phone = TextEditingController(text: property?.phone ?? '');
     String kind = property?.kind ?? 'آپارتمان';
     final formKey = GlobalKey<FormState>();
+    final List<XFile> selectedImages = [];
 
     final result = await showDialog<bool>(
       context: context,
@@ -255,6 +257,12 @@ class _PropertyHomePageState extends State<PropertyHomePage> {
                   _field(area, 'متراژ (متر مربع)', number: true),
                   _field(price, 'قیمت (تومان)', number: true),
                   _field(phone, 'شماره تماس', number: true),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(onPressed: () async {
+                    final picked = await ImagePicker().pickMultiImage(imageQuality: 82);
+                    if (picked.isNotEmpty) setDialogState(() => selectedImages.addAll(picked));
+                  }, icon: const Icon(Icons.photo_library_outlined),
+                  label: Text(selectedImages.isEmpty ? 'انتخاب تصاویر ملک' : '${selectedImages.length} تصویر انتخاب شد')),
                 ]),
               ),
             ),
@@ -298,6 +306,7 @@ class _PropertyHomePageState extends State<PropertyHomePage> {
           final savedId = saved['id']?.toString();
           if (property == null && _properties.isNotEmpty) _properties.first.id = savedId;
           if (property != null) property.id = savedId;
+          if (savedId != null) { for (final image in selectedImages) { await AmlakSupabase.uploadImage(savedId, image); } }
         } catch (e) {
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('ذخیره آنلاین انجام نشد؛ نسخه گوشی نگهداری شد: $e')));
