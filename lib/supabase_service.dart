@@ -14,7 +14,7 @@ class AmlakSupabase {
     if (user == null) return [];
     final rows = await client.from('properties').select(
       'id,title,property_type,address,area,price,phone,created_at'
-    ).eq('user_id', user.id).order('created_at', ascending: false);
+    ).eq('owner_id', user.id).order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(rows);
   }
 
@@ -30,7 +30,7 @@ class AmlakSupabase {
     final user = currentUser;
     if (user == null) throw const AuthException('ابتدا وارد حساب کاربری شوید.');
     final values = <String, dynamic>{
-      'user_id': user.id,
+      'owner_id': user.id,
       'title': title,
       'property_type': kind,
       'address': address,
@@ -55,7 +55,10 @@ class AmlakSupabase {
     final extension = image.name.contains('.') ? image.name.split('.').last : 'jpg';
     final path = '${user.id}/$propertyId/${DateTime.now().microsecondsSinceEpoch}.$extension';
     await client.storage.from(bucket).upload(path, File(image.path));
-    await client.from('property_images').insert({'property_id': propertyId, 'user_id': user.id, 'storage_path': path});
+    await client.from('property_images').insert({
+      'property_id': propertyId,
+      'image_url': path,
+    });
     return path;
   }
 
