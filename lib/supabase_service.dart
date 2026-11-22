@@ -67,7 +67,7 @@ class AmlakSupabase {
     required String area, required String price, required String phone,
     String dealType='فروش', String city='گرگان', String neighborhood='',
     String deposit='', String monthlyRent='', String bedrooms='', String buildingAge='',
-    bool parking=false,bool elevator=false,bool storage=false,
+    bool parking=false,bool elevator=false,bool storage=false,List<String> features=const [],
     String sellerName='',String documentType='',String description='',String status='active',
   }) async {
     num? n(String s)=>num.tryParse(s.replaceAll(',','').trim());
@@ -76,7 +76,7 @@ class AmlakSupabase {
       'city':city,'address':address,'neighborhood':neighborhood,'area':n(area),
       'price':n(price),'deposit':n(deposit),'monthly_rent':n(monthlyRent),
       'bedrooms':int.tryParse(bedrooms),'building_age':int.tryParse(buildingAge),
-      'parking':parking,'elevator':elevator,'storage':storage,'phone':phone,
+      'parking':parking,'elevator':elevator,'storage':storage,'features':features,'phone':phone,
       'seller_name':sellerName,'document_type':documentType,'description':description,'status':status,
       'updated_at':DateTime.now().toUtc().toIso8601String(),
     };
