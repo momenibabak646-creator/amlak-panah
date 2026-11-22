@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -12,9 +14,27 @@ class AmlakSupabase {
   static Future<Map<String,dynamic>> profile() async =>
       await client.from('profiles').select().eq('id', uid).single();
 
+  static String _cacheKey(String table) => 'amlak_panah_${uid}_$table';
+  static Future<void> _writeCache(String table,List<Map<String,dynamic>> rows) async {
+    final prefs=await SharedPreferences.getInstance();
+    await prefs.setString(_cacheKey(table),jsonEncode(rows));
+  }
+  static Future<List<Map<String,dynamic>>> _readCache(String table) async {
+    final prefs=await SharedPreferences.getInstance();
+    final raw=prefs.getString(_cacheKey(table));
+    if(raw==null)return <Map<String,dynamic>>[];
+    return (jsonDecode(raw) as List).map((e)=>Map<String,dynamic>.from(e as Map)).toList();
+  }
   static Future<List<Map<String,dynamic>>> list(String table,{String order='created_at'}) async {
-    final rows=await client.from(table).select().order(order,ascending:false);
-    return List<Map<String,dynamic>>.from(rows);
+    try {
+      final rows=List<Map<String,dynamic>>.from(await client.from(table).select().order(order,ascending:false));
+      await _writeCache(table,rows);
+      return rows;
+    } catch (_) {
+      final cached=await _readCache(table);
+      if(cached.isNotEmpty)return cached;
+      rethrow;
+    }
   }
   static Future<List<Map<String,dynamic>>> loadProperties() async => list('properties');
   static Future<List<Map<String,dynamic>>> loadCustomers() async => list('customers');
@@ -22,13 +42,25 @@ class AmlakSupabase {
   static Future<List<Map<String,dynamic>>> loadProfiles() async => list('profiles');
 
   static Future<Map<String,dynamic>> saveRow(String table,Map<String,dynamic> values,{String? id}) async {
-    final data={...values,'owner_id':uid};
-    if(id==null) return await client.from(table).insert(data).select().single();
-    data.remove('owner_id');
-    return await client.from(table).update(data).eq('id',id).select().single();
+    final data=<String,dynamic>{...values,'owner_id':uid};
+    final Map<String,dynamic> saved;
+    if(id==null) {
+      saved=Map<String,dynamic>.from(await client.from(table).insert(data).select().single());
+    } else {
+      data.remove('owner_id');
+      saved=Map<String,dynamic>.from(await client.from(table).update(data).eq('id',id).select().single());
+    }
+    final cached=await _readCache(table);
+    final index=cached.indexWhere((row)=>row['id']==saved['id']);
+    if(index<0)cached.insert(0,saved);else cached[index]=saved;
+    await _writeCache(table,cached);
+    return saved;
   }
   static Future<void> deleteRow(String table,String id) async {
     await client.from(table).delete().eq('id',id);
+    final cached=await _readCache(table);
+    cached.removeWhere((row)=>row['id']==id);
+    await _writeCache(table,cached);
   }
   static Future<Map<String,dynamic>> saveProperty({
     String? id, required String title, required String kind, required String address,
@@ -38,7 +70,7 @@ class AmlakSupabase {
     bool parking=false,bool elevator=false,bool storage=false,
     String sellerName='',String documentType='',String description='',String status='active',
   }) async {
-    final n(String s)=>num.tryParse(s.replaceAll(',','').trim());
+    num? n(String s)=>num.tryParse(s.replaceAll(',','').trim());
     final values=<String,dynamic>{
       'title':title,'property_type':kind,'deal_type':dealType,'transaction_type':dealType,
       'city':city,'address':address,'neighborhood':neighborhood,'area':n(area),
@@ -48,8 +80,17 @@ class AmlakSupabase {
       'seller_name':sellerName,'document_type':documentType,'description':description,'status':status,
       'updated_at':DateTime.now().toUtc().toIso8601String(),
     };
-    if(id==null) return await client.from('properties').insert({...values,'owner_id':uid}).select().single();
-    return await client.from('properties').update(values).eq('id',id).select().single();
+    final Map<String,dynamic> saved;
+    if(id==null) {
+      saved=Map<String,dynamic>.from(await client.from('properties').insert({...values,'owner_id':uid}).select().single());
+    } else {
+      saved=Map<String,dynamic>.from(await client.from('properties').update(values).eq('id',id).select().single());
+    }
+    final cached=await _readCache('properties');
+    final index=cached.indexWhere((row)=>row['id']==saved['id']);
+    if(index<0)cached.insert(0,saved);else cached[index]=saved;
+    await _writeCache('properties',cached);
+    return saved;
   }
   static Future<String> uploadImage(String propertyId,XFile image) async {
     final ext=image.name.contains('.')?image.name.split('.').last:'jpg';
