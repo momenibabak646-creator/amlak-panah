@@ -1,7 +1,7 @@
 name: Flutter Android CI
 
 concurrency:
-  group: amlak-panah-android-${{ github.ref }}
+  group: amlak-panah-android-release-${{ github.ref }}
   cancel-in-progress: true
 
 on:
