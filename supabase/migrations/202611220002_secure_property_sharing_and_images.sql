@@ -17,10 +17,13 @@ drop policy if exists "View property images" on public.property_images;
 drop policy if exists "property images read" on public.property_images;
 drop policy if exists "Add property images" on public.property_images;
 drop policy if exists "property images insert" on public.property_images;
+drop policy if exists "property images delete" on public.property_images;
 create policy "property images read" on public.property_images for select to authenticated
 using (exists(select 1 from public.properties p where p.id=property_images.property_id and (p.owner_id=(select auth.uid()) or public.is_manager() or public.can_view_all_properties() or exists(select 1 from public.property_access a where a.property_id=p.id and a.user_id=(select auth.uid())))));
 create policy "property images insert" on public.property_images for insert to authenticated
 with check (exists(select 1 from public.properties p where p.id=property_images.property_id and (p.owner_id=(select auth.uid()) or public.is_manager())));
+create policy "property images delete" on public.property_images for delete to authenticated
+using (exists(select 1 from public.properties p where p.id=property_images.property_id and (p.owner_id=(select auth.uid()) or public.is_manager())));
 drop policy if exists "Authenticated users can view property images" on storage.objects;
 drop policy if exists "Authenticated users can upload property images" on storage.objects;
 drop policy if exists "Authenticated users can delete property images" on storage.objects;
