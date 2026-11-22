@@ -42,15 +42,27 @@ create index if not exists followups_customer_id_idx on public.followups(custome
 create index if not exists followups_property_id_idx on public.followups(property_id);
 create index if not exists profiles_created_by_idx on public.profiles(created_by);
 alter function public.generate_property_code() set search_path='';
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated;
+create or replace function private.is_manager()
+returns boolean language sql stable security definer set search_path=''
+as $$ select exists(select 1 from public.profiles where id=(select auth.uid()) and role='manager'); $$;
+create or replace function private.can_view_all_properties()
+returns boolean language sql stable security definer set search_path=''
+as $$ select coalesce((select can_view_other_properties from public.profiles where id=(select auth.uid())),false); $$;
+revoke all on function private.is_manager() from public, anon;
+revoke all on function private.can_view_all_properties() from public, anon;
+grant execute on function private.is_manager() to authenticated;
+grant execute on function private.can_view_all_properties() to authenticated;
 create or replace function public.is_manager()
 returns boolean language sql stable security invoker set search_path=''
-as $ select exists(select 1 from public.profiles where id=(select auth.uid()) and role='manager'); $;
+as $$ select private.is_manager(); $$;
 create or replace function public.can_view_all_properties()
 returns boolean language sql stable security invoker set search_path=''
-as $ select coalesce((select can_view_other_properties from public.profiles where id=(select auth.uid())),false); $;
-revoke all on function public.handle_new_user() from public, anon, authenticated;
-revoke all on function public.can_view_all_properties() from public, anon;
+as $$ select private.can_view_all_properties(); $$;
 revoke all on function public.is_manager() from public, anon;
-grant execute on function public.can_view_all_properties() to authenticated;
+revoke all on function public.can_view_all_properties() from public, anon;
 grant execute on function public.is_manager() to authenticated;
+grant execute on function public.can_view_all_properties() to authenticated;
 commit;
