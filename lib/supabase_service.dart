@@ -101,6 +101,20 @@ class AmlakSupabase {
   }
   static Future<String> createSignedImageUrl(String path)=>
       client.storage.from(bucket).createSignedUrl(path,604800);
+  static Future<List<Map<String,dynamic>>> loadPropertyImages(String propertyId) async {
+    final rows=List<Map<String,dynamic>>.from(await client.from('property_images').select().eq('property_id',propertyId).order('created_at'));
+    final output=<Map<String,dynamic>>[];
+    for(final row in rows){
+      final path=(row['image_url']??row['storage_path'])?.toString()??'';
+      if(path.isEmpty)continue;
+      try{row['signed_url']=await createSignedImageUrl(path);output.add(row);}catch(_){}
+    }
+    return output;
+  }
+  static Future<void> deletePropertyImage(String imageId,String path) async {
+    await client.storage.from(bucket).remove([path]);
+    await client.from('property_images').delete().eq('id',imageId);
+  }
   static Future<void> grantProperty(String propertyId,String userId) async {
     await client.from('property_access').insert({'property_id':propertyId,'user_id':userId,'granted_by':uid});
   }
