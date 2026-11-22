@@ -31,7 +31,7 @@ class _SignInPageState extends State<SignInPage>{
  @override void dispose(){email.dispose();password.dispose();super.dispose();}
  Future<void> submit()async{setState(()=>{busy=true,error=null});try{if(signup){await Supabase.instance.client.auth.signUp(email:email.text.trim(),password:password.text);}else{await Supabase.instance.client.auth.signInWithPassword(email:email.text.trim(),password:password.text);}}on AuthException catch(e){error=e.message;}catch(e){error=e.toString();}if(mounted)setState(()=>busy=false);}
  @override Widget build(BuildContext context)=>Scaffold(body:Center(child:SingleChildScrollView(padding:const EdgeInsets.all(24),child:ConstrainedBox(constraints:const BoxConstraints(maxWidth:420),child:Card(child:Padding(padding:const EdgeInsets.all(24),child:Column(mainAxisSize:MainAxisSize.min,children:[
- const Icon(Icons.home_work,size:60,color:Color(0xFFB58A35)),const SizedBox(height:10),const Text('املاک پناه',style:TextStyle(fontSize:25,fontWeight:FontWeight.bold)),Text(signup?'ایجاد حساب کاربری':'ورود به حساب'),const SizedBox(height:18),
+ const Icon(Icons.home_work,size:60,color:Color(0xFFB58A35)),const SizedBox(height:10),const Text('املاک پناه',style:TextStyle(fontSize:25,fontWeight:FontWeight.bold)),Text(signup?'ایجاد حساب کاربری':'ورود به حساب کاربری'),const SizedBox(height:18),
  TextField(controller:email,keyboardType:TextInputType.emailAddress,decoration:const InputDecoration(labelText:'ایمیل',border:OutlineInputBorder())),const SizedBox(height:12),
  TextField(controller:password,obscureText:true,decoration:const InputDecoration(labelText:'رمز عبور',border:OutlineInputBorder())),
  if(error!=null)Padding(padding:const EdgeInsets.all(8),child:Text(error!,style:const TextStyle(color:Colors.red))),
