@@ -1,8 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app_config.dart';
+import 'supabase_service.dart';
 
-void main() => runApp(const AmlakPanahApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.initialize();
+  runApp(const AmlakPanahApp());
+}
 
 class AmlakPanahApp extends StatelessWidget {
   const AmlakPanahApp({super.key});
@@ -20,24 +27,126 @@ class AmlakPanahApp extends StatelessWidget {
       ),
       home: const Directionality(
         textDirection: TextDirection.rtl,
-        child: PropertyHomePage(),
+        child: AuthGate(),
       ),
     );
   }
 }
 
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!AppConfig.hasSupabase) return const PropertyHomePage();
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        if (Supabase.instance.client.auth.currentUser != null) {
+          return const PropertyHomePage();
+        }
+        return const SignInPage();
+      },
+    );
+  }
+}
+
+class SignInPage extends StatefulWidget {
+  const SignInPage({super.key});
+  @override
+  State<SignInPage> createState() => _SignInPageState();
+}
+
+class _SignInPageState extends State<SignInPage> {
+  final email = TextEditingController();
+  final password = TextEditingController();
+  bool isSignUp = false;
+  bool busy = false;
+  String? error;
+
+  @override
+  void dispose() {
+    email.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
+  Future<void> submit() async {
+    setState(() { busy = true; error = null; });
+    try {
+      if (isSignUp) {
+        await Supabase.instance.client.auth.signUp(
+          email: email.text.trim(), password: password.text,
+        );
+      } else {
+        await Supabase.instance.client.auth.signInWithPassword(
+          email: email.text.trim(), password: password.text,
+        );
+      }
+    } on AuthException catch (e) {
+      setState(() => error = e.message);
+    } catch (e) {
+      setState(() => error = 'خطا در ارتباط: $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.home_work, size: 56, color: Color(0xFFB58A35)),
+                const SizedBox(height: 12),
+                const Text('املاک پناه', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text(isSignUp ? 'ایجاد حساب کاربری' : 'ورود به حساب کاربری'),
+                const SizedBox(height: 20),
+                TextField(controller: email, keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'ایمیل', border: OutlineInputBorder())),
+                const SizedBox(height: 12),
+                TextField(controller: password, obscureText: true,
+                  decoration: const InputDecoration(labelText: 'رمز عبور', border: OutlineInputBorder())),
+                if (error != null) Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(error!, style: const TextStyle(color: Colors.red)),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(width: double.infinity, child: FilledButton(
+                  onPressed: busy ? null : submit,
+                  child: Text(busy ? 'لطفاً صبر کنید...' : (isSignUp ? 'ثبت‌نام' : 'ورود')),
+                )),
+                TextButton(onPressed: () => setState(() { isSignUp = !isSignUp; error = null; }),
+                  child: Text(isSignUp ? 'حساب دارم؛ ورود' : 'حساب ندارم؛ ثبت‌نام')),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class Property {
-  Property({required this.title, required this.location, required this.area,
+  Property({this.id, required this.title, required this.location, required this.area,
     required this.price, required this.phone, required this.kind});
+  String? id;
   String title, location, area, price, phone, kind;
 
   Map<String, dynamic> toJson() => {
-    'title': title, 'location': location, 'area': area,
+    'id': id, 'title': title, 'location': location, 'area': area,
     'price': price, 'phone': phone, 'kind': kind,
   };
 
   factory Property.fromJson(Map<String, dynamic> json) => Property(
-    title: json['title'] ?? '', location: json['location'] ?? '',
+    id: json['id']?.toString(), title: json['title'] ?? '', location: json['location'] ?? '',
     area: json['area'] ?? '', price: json['price'] ?? '',
     phone: json['phone'] ?? '', kind: json['kind'] ?? 'آپارتمان',
   );
@@ -70,6 +179,25 @@ class _PropertyHomePageState extends State<PropertyHomePage> {
           Property.fromJson(Map<String, dynamic>.from(item))));
       } catch (_) {
         // Ignore invalid local cache and start with an empty list.
+      }
+    }
+    if (AppConfig.hasSupabase && AmlakSupabase.currentUser != null) {
+      try {
+        final cloudRows = await AmlakSupabase.loadProperties();
+        _properties
+          ..clear()
+          ..addAll(cloudRows.map((row) => Property(
+            id: row['id']?.toString(),
+            title: row['title']?.toString() ?? '',
+            location: row['address']?.toString() ?? '',
+            area: row['area']?.toString() ?? '',
+            price: row['price']?.toString() ?? '',
+            phone: row['phone']?.toString() ?? '',
+            kind: row['property_type']?.toString() ?? 'آپارتمان',
+          )));
+        await _saveProperties();
+      } catch (_) {
+        // Keep the local copy available when cloud sync is temporarily unavailable.
       }
     }
     if (mounted) setState(() => _loading = false);
@@ -159,6 +287,22 @@ class _PropertyHomePageState extends State<PropertyHomePage> {
           property.kind = kind;
         }
       });
+      if (AppConfig.hasSupabase && AmlakSupabase.currentUser != null) {
+        try {
+          final saved = await AmlakSupabase.saveProperty(
+            id: property?.id,
+            title: title.text.trim(), kind: kind,
+            address: location.text.trim(), area: area.text.trim(),
+            price: price.text.trim(), phone: phone.text.trim(),
+          );
+          final savedId = saved['id']?.toString();
+          if (property == null && _properties.isNotEmpty) _properties.first.id = savedId;
+          if (property != null) property.id = savedId;
+        } catch (e) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('ذخیره آنلاین انجام نشد؛ نسخه گوشی نگهداری شد: $e')));
+        }
+      }
       await _saveProperties();
     }
     title.dispose(); location.dispose(); area.dispose(); price.dispose(); phone.dispose();
@@ -185,6 +329,9 @@ class _PropertyHomePageState extends State<PropertyHomePage> {
           Text('مدیریت فایل‌های املاک', style: TextStyle(fontSize: 12)),
         ]),
         actions: [
+          if (AppConfig.hasSupabase && AmlakSupabase.currentUser != null)
+            IconButton(tooltip: 'خروج', onPressed: () => Supabase.instance.client.auth.signOut(),
+              icon: const Icon(Icons.logout)),
           IconButton(tooltip: 'افزودن فایل', onPressed: () => _editProperty(),
             icon: const Icon(Icons.add_circle_outline, size: 28)),
           const SizedBox(width: 8),
@@ -252,7 +399,13 @@ class _PropertyHomePageState extends State<PropertyHomePage> {
                             PopupMenuButton<String>(
                               onSelected: (v) {
                                 if (v == 'edit') _editProperty(p);
-                                if (v == 'delete') { setState(() => _properties.remove(p)); _saveProperties(); }
+                                if (v == 'delete') {
+                                  setState(() => _properties.remove(p));
+                                  if (p.id != null && AppConfig.hasSupabase && AmlakSupabase.currentUser != null) {
+                                    AmlakSupabase.deleteProperty(p.id!).catchError((_) {});
+                                  }
+                                  _saveProperties();
+                                }
                               },
                               itemBuilder: (_) => const [
                                 PopupMenuItem(value: 'edit', child: Text('ویرایش')),
