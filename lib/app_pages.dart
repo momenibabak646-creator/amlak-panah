@@ -55,7 +55,40 @@ class _PropertiesPageState extends State<PropertiesPage>{
       )));
     }catch(e){_error(e);}
   }
-  Future<void> details(Map<String,dynamic> p)async{await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(title:Text(p['title']??'جزئیات ملک'),content:SizedBox(width:480,child:SingleChildScrollView(child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[FutureBuilder<List<Map<String,dynamic>>>(future:AmlakSupabase.loadPropertyImages(p['id'].toString()),builder:(ctx,s){if(s.connectionState==ConnectionState.waiting)return const Center(child:CircularProgressIndicator());final imgs=s.data??[];if(imgs.isEmpty)return const Text('برای این ملک تصویری ثبت نشده است.');return SizedBox(height:150,child:ListView(scrollDirection:Axis.horizontal,children:imgs.map((im)=>Padding(padding:const EdgeInsets.all(4),child:Image.network(im['signed_url'],width:190,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const SizedBox(width:190,child:Center(child:Icon(Icons.broken_image)))))).toList()));}),const SizedBox(height:12),Text('نوع ملک: ${p['property_type']??'—'}'),Text('معامله: ${p['deal_type']??'—'}'),Text('شهر و محله: ${p['city']??''} - ${p['neighborhood']??''}'),Text('آدرس: ${p['address']??'—'}'),Text('متراژ: ${p['area']??'—'} متر'),Text('قیمت: ${money(p['price'])}'),Text('ودیعه: ${money(p['deposit'])} | اجاره: ${money(p['monthly_rent'])}'),Text('خواب: ${p['bedrooms']??'—'} | سن بنا: ${p['building_age']??'—'}'),Text('پارکینگ: ${p['parking']==true?'دارد':'ندارد'} | آسانسور: ${p['elevator']==true?'دارد':'ندارد'} | انباری: ${p['storage']==true?'دارد':'ندارد'}'),Text('مالک: ${p['seller_name']??'—'} | تماس: ${p['phone']??'—'}'),Text('کد فایل: ${p['file_code']??'—'}'),Text('توضیحات: ${p['description']??'—'}')]))),actions:[TextButton.icon(onPressed:()=>shareProperty(p),icon:const Icon(Icons.share),label:const Text('اشتراک با مشاوران')),TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('بستن'))]));}
+  Future<void> details(Map<String,dynamic> p)async{
+    await showDialog<void>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,refresh)=>AlertDialog(
+      title:Text(p['title']??'جزئیات ملک'),
+      content:SizedBox(width:480,child:SingleChildScrollView(child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
+        FutureBuilder<List<Map<String,dynamic>>>(future:AmlakSupabase.loadPropertyImages(p['id'].toString()),builder:(ctx,s){
+          if(s.connectionState==ConnectionState.waiting)return const Center(child:CircularProgressIndicator());
+          final imgs=s.data??[];
+          if(imgs.isEmpty)return const Text('برای این ملک تصویری ثبت نشده است.');
+          return SizedBox(height:190,child:ListView(scrollDirection:Axis.horizontal,children:imgs.map((im)=>SizedBox(width:170,child:Card(child:Column(children:[
+            Expanded(child:Image.network(im['signed_url'],fit:BoxFit.cover,width:170,errorBuilder:(_,__,___)=>const Icon(Icons.broken_image))),
+            IconButton(tooltip:'حذف تصویر',onPressed:()async{try{await AmlakSupabase.deletePropertyImage(im['id'].toString(),im['image_url'].toString());refresh((){});}catch(e){_error(e);}},icon:const Icon(Icons.delete_outline,color:Colors.red))
+          ])))).toList()));
+        }),
+        const SizedBox(height:12),
+        Text('نوع ملک: ${p['property_type']??'—'}'),
+        Text('معامله: ${p['deal_type']??'—'}'),
+        Text('شهر و محله: ${p['city']??''} - ${p['neighborhood']??''}'),
+        Text('آدرس: ${p['address']??'—'}'),
+        Text('متراژ: ${p['area']??'—'} متر'),
+        Text('قیمت: ${money(p['price'])} ${p['negotiable']==true?'(قابل مذاکره)':''}'),
+        Text('ودیعه: ${money(p['deposit'])} | اجاره: ${money(p['monthly_rent'])}'),
+        Text('کمیسیون: ${money(p['commission_amount'])} | سهم مشاور: ${money(p['consultant_share'])}'),
+        Text('خواب: ${p['bedrooms']??'—'} | سن بنا: ${p['building_age']??'—'}'),
+        Text('پارکینگ: ${p['parking']==true?'دارد':'ندارد'} | آسانسور: ${p['elevator']==true?'دارد':'ندارد'} | انباری: ${p['storage']==true?'دارد':'ندارد'}'),
+        Text('مالک: ${p['seller_name']??'—'} | تماس: ${p['phone']??'—'}'),
+        Text('کد فایل: ${p['file_code']??'—'}'),
+        Text('توضیحات: ${p['description']??'—'}')
+      ]))),
+      actions:[
+        TextButton.icon(onPressed:()=>shareProperty(p),icon:const Icon(Icons.share),label:const Text('اشتراک با مشاوران')),
+        TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('بستن'))
+      ]
+    )));
+  }
 
   @override void initState(){super.initState();load();}
   Future<void> load()async{try{final r=await AmlakSupabase.loadProperties();if(mounted)setState(()=>rows=r);}catch(e){_error(e);}finally{if(mounted)setState(()=>loading=false);}}
@@ -95,7 +128,7 @@ class _PropertyFormState extends State<PropertyForm>{
 
 class CustomersPage extends StatefulWidget {const CustomersPage({super.key});@override State<CustomersPage> createState()=>_CustomersPageState();}
 class _CustomersPageState extends State<CustomersPage>{
- List<Map<String,dynamic>> rows=[];bool loading=true;
+ List<Map<String,dynamic>> rows=[];bool loading=true;String query='';
  @override void initState(){super.initState();load();}
  Future<void> load()async{try{rows=await AmlakSupabase.loadCustomers();}catch(e){err(e);}if(mounted)setState(()=>loading=false);}
  void err(Object e)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('خطا: $e')));
@@ -119,9 +152,17 @@ class _FollowupsPageState extends State<FollowupsPage>{
 }
 
 class ReportsPage extends StatefulWidget{const ReportsPage({super.key});@override State<ReportsPage> createState()=>_ReportsPageState();}
-class _ReportsPageState extends State<ReportsPage>{bool loading=true;List<Map<String,dynamic>> p=[];@override void initState(){super.initState();AmlakSupabase.loadProperties().then((v){if(mounted)setState(() { p=v; loading=false; });}).catchError((_){if(mounted)setState(()=>loading=false);});}
- @override Widget build(BuildContext context){final active=p.where((x)=>x['status']=='active').length;final sold=p.where((x)=>x['status']=='sold').length;final rented=p.where((x)=>x['status']=='rented').length;return loading?const Center(child:CircularProgressIndicator()):ListView(padding:const EdgeInsets.all(16),children:[const Text('گزارش عملکرد فایل‌ها',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),const SizedBox(height:12),_tile('مجموع فایل‌ها',p.length),_tile('فایل‌های فعال',active),_tile('فروخته‌شده',sold),_tile('اجاره‌رفته',rented)]);}
- Widget _tile(String s,int n)=>Card(child:ListTile(title:Text(s),trailing:Text('$n',style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold,color:gold))));}
+class _ReportsPageState extends State<ReportsPage>{
+ bool loading=true;List<Map<String,dynamic>> p=[];
+ @override void initState(){super.initState();load();}
+ Future<void> load()async{try{p=await AmlakSupabase.loadProperties();}catch(_){}if(mounted)setState(()=>loading=false);}
+ @override Widget build(BuildContext context){
+  num sum(String key)=>p.fold<num>(0,(v,x)=>v+(num.tryParse(x[key]?.toString()??'')??0));
+  final active=p.where((x)=>x['status']=='active').length,sold=p.where((x)=>x['status']=='sold').length,rented=p.where((x)=>x['status']=='rented').length,negotiable=p.where((x)=>x['negotiable']==true).length;
+  return loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[const Text('گزارش عملکرد دفتر',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),const SizedBox(height:12),_tile('مجموع فایل‌ها',p.length),_tile('فایل‌های فعال',active),_tile('فروخته‌شده',sold),_tile('اجاره‌رفته',rented),_tile('قابل مذاکره',negotiable),_tile('جمع کمیسیون‌های ثبت‌شده',sum('commission_amount'),moneyValue:true),_tile('جمع سهم مشاوران',sum('consultant_share'),moneyValue:true)]));
+ }
+ Widget _tile(String s,num n,{bool moneyValue=false})=>Card(child:ListTile(title:Text(s),trailing:Text(moneyValue?money(n):n.toString(),style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold,color:gold))));
+}
 
 class TeamPage extends StatefulWidget{const TeamPage({super.key});@override State<TeamPage> createState()=>_TeamPageState();}
 class _TeamPageState extends State<TeamPage>{
