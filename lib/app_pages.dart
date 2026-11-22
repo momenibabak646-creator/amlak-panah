@@ -95,7 +95,7 @@ class _FollowupsPageState extends State<FollowupsPage>{
 }
 
 class ReportsPage extends StatefulWidget{const ReportsPage({super.key});@override State<ReportsPage> createState()=>_ReportsPageState();}
-class _ReportsPageState extends State<ReportsPage>{bool loading=true;List<Map<String,dynamic>> p=[];@override void initState(){super.initState();AmlakSupabase.loadProperties().then((v){if(mounted)setState(()=>{p=v,loading=false});}).catchError((_){if(mounted)setState(()=>loading=false);});}
+class _ReportsPageState extends State<ReportsPage>{bool loading=true;List<Map<String,dynamic>> p=[];@override void initState(){super.initState();AmlakSupabase.loadProperties().then((v){if(mounted)setState(() { p=v; loading=false; });}).catchError((_){if(mounted)setState(()=>loading=false);});}
  @override Widget build(BuildContext context){final active=p.where((x)=>x['status']=='active').length;final sold=p.where((x)=>x['status']=='sold').length;final rented=p.where((x)=>x['status']=='rented').length;return loading?const Center(child:CircularProgressIndicator()):ListView(padding:const EdgeInsets.all(16),children:[const Text('گزارش عملکرد فایل‌ها',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),const SizedBox(height:12),_tile('مجموع فایل‌ها',p.length),_tile('فایل‌های فعال',active),_tile('فروخته‌شده',sold),_tile('اجاره‌رفته',rented)]);}
  Widget _tile(String s,int n)=>Card(child:ListTile(title:Text(s),trailing:Text('$n',style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold,color:gold))));}
 
