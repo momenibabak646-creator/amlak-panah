@@ -21,7 +21,13 @@ class PropertyOcrParser {
   static String? _number(String line) {
     final match = RegExp(r'\d[\d,٬،٫.]*').firstMatch(line);
     if (match == null) return null;
-    return match.group(0)!.replaceAll(RegExp(r'[,٬،]'), '').replaceAll('٫', '.');
+    final raw = match.group(0)!.replaceAll(RegExp(r'[,٬،]'), '').replaceAll('٫', '.');
+    var number = double.tryParse(raw);
+    if (number == null) return raw;
+    if (line.contains('میلیارد')) number *= 1000000000;
+    else if (line.contains('میلیون')) number *= 1000000;
+    else if (line.contains('هزار')) number *= 1000;
+    return number.round().toString();
   }
 
   static Map<String, String> parse(String rawText) {
