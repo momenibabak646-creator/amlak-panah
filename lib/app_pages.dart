@@ -124,9 +124,26 @@ class _ReportsPageState extends State<ReportsPage>{bool loading=true;List<Map<St
  Widget _tile(String s,int n)=>Card(child:ListTile(title:Text(s),trailing:Text('$n',style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold,color:gold))));}
 
 class TeamPage extends StatefulWidget{const TeamPage({super.key});@override State<TeamPage> createState()=>_TeamPageState();}
-class _TeamPageState extends State<TeamPage>{List<Map<String,dynamic>> rows=[];bool loading=true;String role='consultant';@override void initState(){super.initState();load();}
- Future<void> load()async{try{final profile=await AmlakSupabase.profile();role=profile['role']??'consultant';if(role=='manager')rows=await AmlakSupabase.loadProfiles();}catch(_){}if(mounted)setState(()=>loading=false);}
- @override Widget build(BuildContext context)=>loading?const Center(child:CircularProgressIndicator()):role!='manager'?const Center(child:Text('این بخش فقط برای مدیر دفتر فعال است.')):ListView(children:rows.map((p)=>Card(child:ListTile(leading:const Icon(Icons.badge_outlined),title:Text(p['full_name']??'بدون نام'),subtitle:Text('${p['phone']??''} • ${p['role']??''}'),trailing:Icon(p['is_active']==true?Icons.check_circle:Icons.block,color:p['is_active']==true?Colors.green:Colors.red)))).toList());}
+class _TeamPageState extends State<TeamPage>{
+ List<Map<String,dynamic>> rows=[];bool loading=true;bool manager=false;
+ @override void initState(){super.initState();load();}
+ Future<void> load()async{try{final profile=await AmlakSupabase.profile();manager=profile['role']=='manager';if(manager)rows=await AmlakSupabase.loadProfiles();}catch(_){}if(mounted)setState(()=>loading=false);}
+ Future<void> invite()async{
+  final name=TextEditingController(),email=TextEditingController(),phone=TextEditingController();
+  final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('افزودن مشاور جدید'),content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+   TextField(controller:name,decoration:const InputDecoration(labelText:'نام و نام خانوادگی')),
+   TextField(controller:email,keyboardType:TextInputType.emailAddress,decoration:const InputDecoration(labelText:'ایمیل مشاور')),
+   TextField(controller:phone,keyboardType:TextInputType.phone,decoration:const InputDecoration(labelText:'شماره تماس'))
+  ])),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('انصراف')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('ارسال دعوت‌نامه'))]));
+  if(ok!=true)return;
+  if(name.text.trim().isEmpty||!email.text.contains('@')){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('نام و ایمیل معتبر وارد کنید.')));return;}
+  try{final result=await AmlakSupabase.client.functions.invoke('invite-consultant',body:{'full_name':name.text.trim(),'email':email.text.trim(),'phone':phone.text.trim()});if(result.status<200||result.status>=300)throw Exception(result.data);if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('دعوت‌نامه مشاور ارسال شد.')));await load();}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('ارسال دعوت‌نامه ناموفق بود: $e')));}
+  name.dispose();email.dispose();phone.dispose();
+ }
+ @override Widget build(BuildContext context)=>loading?const Center(child:CircularProgressIndicator()):!manager?const Center(child:Text('این بخش فقط برای مدیر دفتر فعال است.')):Scaffold(
+  floatingActionButton:FloatingActionButton.extended(onPressed:invite,backgroundColor:gold,icon:const Icon(Icons.person_add),label:const Text('دعوت مشاور')),
+  body:RefreshIndicator(onRefresh:load,child:rows.isEmpty?const Center(child:Text('هنوز مشاوری ثبت نشده است.')):ListView(children:rows.map((p)=>Card(child:ListTile(leading:const Icon(Icons.badge_outlined),title:Text(p['full_name']??'بدون نام'),subtitle:Text('${p['phone']??''} • ${p['role']??''}'),trailing:Icon(p['is_active']==true?Icons.check_circle:Icons.block,color:p['is_active']==true?Colors.green:Colors.red)))).toList())));
+}
 
 class AppShell extends StatefulWidget{const AppShell({super.key});@override State<AppShell> createState()=>_AppShellState();}
 class _AppShellState extends State<AppShell>{int index=0;final pages=const [DashboardPage(),PropertiesPage(),CustomersPage(),FollowupsPage(),ReportsPage(),TeamPage()];@override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(AppPages.titles[index],style:const TextStyle(fontWeight:FontWeight.bold)),actions:[IconButton(tooltip:'خروج',onPressed:()=>Supabase.instance.client.auth.signOut(),icon:const Icon(Icons.logout))]),body:pages[index],bottomNavigationBar:NavigationBar(selectedIndex:index,onDestinationSelected:(v)=>setState(()=>index=v),destinations:List.generate(AppPages.titles.length,(i)=>NavigationDestination(icon:Icon(AppPages.icons[i]),label:AppPages.titles[i]))));}
