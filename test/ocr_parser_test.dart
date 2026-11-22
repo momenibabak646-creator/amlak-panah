@@ -22,6 +22,18 @@ void main() {
     expect(result['monthly_rent'], '12000000');
   });
 
+  test('normalizes Arabic digits and reads billion price units', () {
+    final result = PropertyOcrParser.parse('قیمت: ۵.۸ میلیارد تومان\nتلفن: ٠٩١٢٣٤٥٦٧٨٩');
+    expect(result['price'], '5800000000');
+    expect(result['phone'], '09123456789');
+  });
+
+  test('detects full deposit when no monthly rent is present', () {
+    final result = PropertyOcrParser.parse('ودیعه: ۴۵۰ میلیون تومان');
+    expect(result['deposit'], '450000000');
+    expect(result['deal_type'], 'رهن کامل');
+  });
+
   test('infers rent and deposit deal type across separate lines', () {
     final result = PropertyOcrParser.parse('رهن: ۳۰۰,۰۰۰,۰۰۰\nاجاره: ۱۲,۰۰۰,۰۰۰');
     expect(result['deposit'], '300000000');
