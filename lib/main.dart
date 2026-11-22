@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() => runApp(const AmlakPanahApp());
 
@@ -28,6 +30,17 @@ class Property {
   Property({required this.title, required this.location, required this.area,
     required this.price, required this.phone, required this.kind});
   String title, location, area, price, phone, kind;
+
+  Map<String, dynamic> toJson() => {
+    'title': title, 'location': location, 'area': area,
+    'price': price, 'phone': phone, 'kind': kind,
+  };
+
+  factory Property.fromJson(Map<String, dynamic> json) => Property(
+    title: json['title'] ?? '', location: json['location'] ?? '',
+    area: json['area'] ?? '', price: json['price'] ?? '',
+    phone: json['phone'] ?? '', kind: json['kind'] ?? 'آپارتمان',
+  );
 }
 
 class PropertyHomePage extends StatefulWidget {
@@ -39,6 +52,34 @@ class PropertyHomePage extends StatefulWidget {
 class _PropertyHomePageState extends State<PropertyHomePage> {
   final List<Property> _properties = [];
   final _search = TextEditingController();
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProperties();
+  }
+
+  Future<void> _loadProperties() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('amlak_panah_properties');
+    if (saved != null) {
+      try {
+        final decoded = jsonDecode(saved) as List<dynamic>;
+        _properties.addAll(decoded.map((item) =>
+          Property.fromJson(Map<String, dynamic>.from(item))));
+      } catch (_) {
+        // Ignore invalid local cache and start with an empty list.
+      }
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _saveProperties() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('amlak_panah_properties',
+      jsonEncode(_properties.map((p) => p.toJson()).toList()));
+  }
 
   List<Property> get _filtered => _properties.where((p) {
     final q = _search.text.trim().toLowerCase();
@@ -118,6 +159,7 @@ class _PropertyHomePageState extends State<PropertyHomePage> {
           property.kind = kind;
         }
       });
+      await _saveProperties();
     }
     title.dispose(); location.dispose(); area.dispose(); price.dispose(); phone.dispose();
   }
@@ -170,7 +212,9 @@ class _PropertyHomePageState extends State<PropertyHomePage> {
           ]),
           const SizedBox(height: 8),
           Expanded(
-            child: items.isEmpty
+            child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : items.isEmpty
               ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.home_work_outlined, size: 64, color: Colors.grey.shade400),
                   const SizedBox(height: 12),
@@ -208,7 +252,7 @@ class _PropertyHomePageState extends State<PropertyHomePage> {
                             PopupMenuButton<String>(
                               onSelected: (v) {
                                 if (v == 'edit') _editProperty(p);
-                                if (v == 'delete') setState(() => _properties.remove(p));
+                                if (v == 'delete') { setState(() => _properties.remove(p)); _saveProperties(); }
                               },
                               itemBuilder: (_) => const [
                                 PopupMenuItem(value: 'edit', child: Text('ویرایش')),
