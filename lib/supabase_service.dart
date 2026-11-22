@@ -55,6 +55,7 @@ class AmlakSupabase {
     final extension = image.name.contains('.') ? image.name.split('.').last : 'jpg';
     final path = '${user.id}/$propertyId/${DateTime.now().microsecondsSinceEpoch}.$extension';
     await client.storage.from(bucket).upload(path, File(image.path));
+    await client.from('property_images').insert({'property_id': propertyId, 'user_id': user.id, 'storage_path': path});
     return path;
   }
 
