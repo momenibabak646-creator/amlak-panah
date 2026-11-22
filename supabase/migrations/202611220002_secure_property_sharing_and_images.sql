@@ -29,6 +29,8 @@ create policy "panah_view_property_images" on storage.objects for select to auth
 using (bucket_id='property-images' and exists(select 1 from public.property_images pi join public.properties p on p.id=pi.property_id where pi.image_url=storage.objects.name and (p.owner_id=(select auth.uid()) or public.is_manager() or public.can_view_all_properties() or exists(select 1 from public.property_access a where a.property_id=p.id and a.user_id=(select auth.uid())))));
 create index if not exists property_access_property_id_idx on public.property_access(property_id);
 create index if not exists property_access_user_id_idx on public.property_access(user_id);
+create index if not exists property_access_granted_by_idx on public.property_access(granted_by);
+create index if not exists properties_owner_id_idx on public.properties(owner_id);
 create index if not exists property_images_property_id_idx on public.property_images(property_id);
 create index if not exists customers_owner_id_idx on public.customers(owner_id);
 create index if not exists followups_owner_id_idx on public.followups(owner_id);
@@ -37,6 +39,8 @@ create index if not exists followups_property_id_idx on public.followups(propert
 create index if not exists profiles_created_by_idx on public.profiles(created_by);
 alter function public.generate_property_code() set search_path='';
 revoke all on function public.handle_new_user() from public, anon, authenticated;
-revoke all on function public.can_view_all_properties() from anon;
-revoke all on function public.is_manager() from anon;
+revoke all on function public.can_view_all_properties() from public, anon;
+revoke all on function public.is_manager() from public, anon;
+grant execute on function public.can_view_all_properties() to authenticated;
+grant execute on function public.is_manager() to authenticated;
 commit;
