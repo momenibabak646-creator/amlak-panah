@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app_config.dart';
@@ -30,7 +33,17 @@ class SignInPage extends StatefulWidget{const SignInPage({super.key});@override 
 class _SignInPageState extends State<SignInPage>{
  final email=TextEditingController(),password=TextEditingController();bool signup=false,busy=false;String? error;
  @override void dispose(){email.dispose();password.dispose();super.dispose();}
- Future<void> submit()async{setState(() { busy=true; error=null; });try{if(signup){await Supabase.instance.client.auth.signUp(email:email.text.trim(),password:password.text);}else{await Supabase.instance.client.auth.signInWithPassword(email:email.text.trim(),password:password.text);}}on AuthException catch(e){error=e.message;}catch(e){error=e.toString();}if(mounted)setState(()=>busy=false);}
+ Future<void> submit()async{setState(() { busy=true; error=null; });try{if(signup){await Supabase.instance.client.auth.signUp(email:email.text.trim(),password:password.text);}else{await Supabase.instance.client.auth.signInWithPassword(email:email.text.trim(),password:password.text);}} on AuthException catch (e) {
+ error = e.message;
+} on SocketException {
+ error = 'اتصال به سرور برقرار نشد. اینترنت گوشی، DNS یا VPN را بررسی کنید و دوباره تلاش کنید.';
+} on TimeoutException {
+ error = 'پاسخ سرور دیر رسید. اتصال اینترنت را بررسی و دوباره تلاش کنید.';
+} on FormatException {
+ error = 'نشانی اتصال سرور معتبر نیست. تنظیمات برنامه باید بررسی شود.';
+} catch (e) {
+ error = 'ورود انجام نشد. لطفاً اتصال اینترنت را بررسی و دوباره تلاش کنید.';
+} if (mounted) setState(() => busy = false);}
  @override Widget build(BuildContext context)=>Scaffold(body:Center(child:SingleChildScrollView(padding:const EdgeInsets.all(24),child:ConstrainedBox(constraints:const BoxConstraints(maxWidth:420),child:Card(child:Padding(padding:const EdgeInsets.all(24),child:Column(mainAxisSize:MainAxisSize.min,children:[
  const BrandLogo(size:144),const SizedBox(height:10),Text(signup?'ایجاد حساب کاربری':'ورود به حساب کاربری'),const SizedBox(height:18),
  TextField(controller:email,keyboardType:TextInputType.emailAddress,decoration:const InputDecoration(labelText:'ایمیل',border:OutlineInputBorder())),const SizedBox(height:12),
