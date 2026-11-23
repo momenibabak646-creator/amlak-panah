@@ -1,7 +1,7 @@
 name: amlak_panah
 description: Amlak Panah Real Estate App
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -23,5 +23,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/panah_logo.webp
     - assets/tessdata_config.json
     - assets/tessdata/

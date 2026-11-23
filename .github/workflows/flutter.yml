@@ -21,6 +21,11 @@ jobs:
           channel: stable
       - name: Generate Android project files
         run: flutter create --platforms=android --project-name=amlak_panah .
+      - name: Restore original Panah logo
+        run: |
+          mkdir -p assets
+          base64 --decode assets/panah_logo.webp.b64 > assets/panah_logo.webp
+          test -s assets/panah_logo.webp
       - name: Download Persian OCR model
         run: |
           mkdir -p assets/tessdata
