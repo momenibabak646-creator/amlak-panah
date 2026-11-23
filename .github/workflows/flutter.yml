@@ -24,7 +24,7 @@ jobs:
       - name: Restore original Panah logo
         run: |
           mkdir -p assets
-          base64 --decode assets/panah_logo.webp.b64 > assets/panah_logo.webp
+          cp assets/panah_logo.webp.b64 assets/panah_logo.webp
           test -s assets/panah_logo.webp
       - name: Download Persian OCR model
         run: |
