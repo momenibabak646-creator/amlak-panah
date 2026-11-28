@@ -1,0 +1,58 @@
+# گزارش امنیتی نسخه ۱۱ — املاک پناه
+
+تاریخ بررسی: ۲۸ نوامبر ۲۰۲۶
+
+## تغییرات اعمال‌شده روی Supabase زنده
+- مهاجرت ثبت‌شده: `20261128072004 secure_property_columns_and_client_privileges`
+- جدول جدید `property_manager_financials` برای کمیسیون و سهم مشاور؛ RLS فقط مدیر فعال.
+- مقادیر قدیمی ستون‌های مالی به جدول جدید منتقل شدند؛ در زمان مهاجرت هر سه ستون قدیمی در تنها ملک موجود خالی بودند.
+- یادداشت قدیمی ملک در صورت وجود به `property_private_notes` منتقل می‌شود.
+- مجوزهای کلی و ستونی قبلی جدول `properties` از نقش‌های API بازپس گرفته شد؛ سپس فقط ستون‌های لازم برای برنامه مجدداً مجاز شدند.
+- دسترسی `TRUNCATE`، `TRIGGER` و `REFERENCES` از نقش‌های `anon` و `authenticated` روی جدول‌های عمومی حذف شد.
+- مجوزهای لازم برای `property_access`، `property_private_notes` و `backup_restore_runs` که قبلاً policy داشتند اما GRANT کافی نداشتند، اعطا شد.
+
+## نتیجه کنترل مجوزها
+| کنترل | نتیجه |
+|---|---|
+| SELECT سراسری روی جدول properties برای authenticated | غیرفعال |
+| SELECT ستون title | فعال |
+| SELECT ستون‌های قدیمی commission_amount / consultant_share / private_note | غیرفعال |
+| UPDATE/INSERT ستون‌های حساس قدیمی | غیرفعال |
+| TRUNCATE برای anon و authenticated روی properties | غیرفعال |
+| SELECT/INSERT جدول property_access | فعال، با RLS |
+| SELECT/INSERT جدول property_private_notes | فعال، با RLS مالک/مدیر |
+| SELECT/INSERT جدول backup_restore_runs | فعال، با RLS |
+| جدول property_manager_financials | فعال، با RLS مدیر فعال |
+
+اسکریپت `supabase/tests/security_privileges.sql` روی پروژه زنده اجرا شد و بدون خطا تمام کنترل‌ها را گذراند.
+
+## آزمون نشست مدیر
+با شناسه مدیر موجود، یک تراکنش آزمایشی با نقش `authenticated` اجرا شد:
+- مدیر ۱ ملک موجود را دید.
+- خواندن جدول مالی و یادداشت خصوصی بدون خطا انجام شد.
+- درج آزمایشی در `property_manager_financials` و `property_private_notes` موفق بود.
+- درج آزمایشی در `backup_restore_runs` نیز موفق بود.
+- همه داده‌های آزمایشی با `ROLLBACK` برگشت داده شدند؛ هیچ رکورد آزمایشی باقی نماند.
+
+## وضعیت داده پس از آزمون
+| جدول | تعداد |
+|---|---:|
+| properties | ۱ |
+| property_private_notes | ۰ |
+| property_manager_financials | ۰ |
+| property_access | ۰ |
+| backup_restore_runs | ۰ |
+
+## تغییرات سورس Flutter
+- دریافت املاک با فهرست صریح ستون‌های مجاز انجام می‌شود؛ دیگر `select(*)` روی properties استفاده نمی‌شود.
+- اطلاعات کمیسیون و سهم مشاور جداگانه و فقط برای مدیر خوانده می‌شود.
+- فرم و جزئیات مالی برای مشاور پنهان است.
+- کنترل ویرایش/حذف در رابط فقط برای مالک یا مدیر نمایش داده می‌شود.
+- پنل مدیر اکنون دو کنترل مستقل برای فعال/غیرفعال‌کردن حساب و مجوز مشاهده فایل‌های سایر مشاوران دارد.
+- تست واحد مالکیت در `test/property_permissions_test.dart` اضافه شد.
+
+## محدودیت‌های باقی‌مانده
+- هنوز هیچ حساب مشاوری در پروژه زنده وجود ندارد؛ آزمون واقعی دو مشاور با مجوزهای متفاوت انجام نشده است.
+- Flutter Analyze، تست Flutter و ساخت APK هنوز توسط CI تأیید نشده‌اند؛ اجرای workflow در این نوبت مشاهده نشد.
+- Windows build، خروجی Excel/PDF و پشتیبان‌گیری/بازیابی در مخزن اصلی فعلی هنوز یکپارچه و آزمایش نشده‌اند.
+- هشدار Security Advisor درباره خاموش بودن Leaked Password Protection همچنان باقی است و باید از تنظیمات Auth فعال شود.
