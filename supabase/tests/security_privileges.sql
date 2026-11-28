@@ -25,6 +25,20 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'client roles must not have TRUNCATE on any public table';
   END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind = 'r'
+      AND (
+        has_table_privilege('anon', c.oid, 'TRIGGER')
+        OR has_table_privilege('authenticated', c.oid, 'TRIGGER')
+        OR has_table_privilege('anon', c.oid, 'REFERENCES')
+        OR has_table_privilege('authenticated', c.oid, 'REFERENCES')
+      )
+  ) THEN
+    RAISE EXCEPTION 'client roles must not have TRIGGER or REFERENCES on public tables';
+  END IF;
   IF NOT has_column_privilege('authenticated', 'public.properties', 'title', 'SELECT') THEN
     RAISE EXCEPTION 'safe property columns are not readable';
   END IF;
