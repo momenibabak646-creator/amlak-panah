@@ -13,9 +13,17 @@ BEGIN
      OR has_column_privilege('authenticated', 'public.properties', 'private_note', 'INSERT') THEN
     RAISE EXCEPTION 'sensitive legacy property columns remain writable';
   END IF;
-  IF has_table_privilege('authenticated', 'public.properties', 'TRUNCATE')
-     OR has_table_privilege('anon', 'public.properties', 'TRUNCATE') THEN
-    RAISE EXCEPTION 'client roles must not have TRUNCATE on properties';
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind = 'r'
+      AND (
+        has_table_privilege('anon', c.oid, 'TRUNCATE')
+        OR has_table_privilege('authenticated', c.oid, 'TRUNCATE')
+      )
+  ) THEN
+    RAISE EXCEPTION 'client roles must not have TRUNCATE on any public table';
   END IF;
   IF NOT has_column_privilege('authenticated', 'public.properties', 'title', 'SELECT') THEN
     RAISE EXCEPTION 'safe property columns are not readable';
