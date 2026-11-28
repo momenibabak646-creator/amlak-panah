@@ -8,6 +8,7 @@ class AmlakSupabase {
   AmlakSupabase._();
   static final client = Supabase.instance.client;
   static const bucket = 'property-images';
+  static const propertySelect = 'id,owner_id,title,property_type,deal_type,city,address,area,price,deposit,monthly_rent,bedrooms,description,features,status,created_at,phone,seller_name,document_type,building_age,parking,elevator,storage,latitude,longitude,transaction_type,neighborhood,file_code,updated_at,sold_at,expires_at,negotiable,assigned_to';
   static User? get currentUser => client.auth.currentUser;
   static String get uid => currentUser?.id ?? (throw const AuthException('ابتدا وارد حساب شوید.'));
 
@@ -36,7 +37,53 @@ class AmlakSupabase {
       rethrow;
     }
   }
-  static Future<List<Map<String,dynamic>>> loadProperties() async => list('properties');
+  static Future<bool> isManager() async {
+    final p = await profile();
+    return p['role'] == 'manager' && p['is_active'] == true;
+  }
+
+  static Future<List<Map<String,dynamic>>> loadProperties() async {
+    try {
+      final rows = List<Map<String,dynamic>>.from(
+        await client.from('properties').select(propertySelect).order('created_at', ascending: false),
+      );
+      final notes = List<Map<String,dynamic>>.from(
+        await client.from('property_private_notes').select('property_id,note'),
+      );
+      final noteByProperty = <String, Map<String,dynamic>>{
+        for (final row in notes) row['property_id'].toString(): row,
+      };
+      final manager = await isManager();
+      final financeRows = manager
+          ? List<Map<String,dynamic>>.from(
+              await client.from('property_manager_financials')
+                  .select('property_id,commission_amount,consultant_share'),
+            )
+          : <Map<String,dynamic>>[];
+      final financeByProperty = <String, Map<String,dynamic>>{
+        for (final row in financeRows) row['property_id'].toString(): row,
+      };
+      final output = rows.map((row) {
+        final id = row['id'].toString();
+        final note = noteByProperty[id];
+        final finance = financeByProperty[id];
+        return <String,dynamic>{
+          ...row,
+          'private_note': note?['note'] ?? '',
+          if (manager) ...{
+            'commission_amount': finance?['commission_amount'],
+            'consultant_share': finance?['consultant_share'],
+          },
+        };
+      }).toList();
+      await _writeCache('properties', output);
+      return output;
+    } catch (_) {
+      final cached = await _readCache('properties');
+      if (cached.isNotEmpty) return cached;
+      rethrow;
+    }
+  }
   static Future<List<Map<String,dynamic>>> loadCustomers() async => list('customers');
   static Future<List<Map<String,dynamic>>> loadFollowups() async => list('followups',order:'followup_date');
   static Future<List<Map<String,dynamic>>> loadProfiles() async => list('profiles');
@@ -68,7 +115,7 @@ class AmlakSupabase {
     String dealType='فروش', String city='گرگان', String neighborhood='',
     String deposit='', String monthlyRent='', String bedrooms='', String buildingAge='',
     bool parking=false,bool elevator=false,bool storage=false,List<String> features=const [],
-    String sellerName='',String documentType='',String description='',String status='active',String commissionAmount='',String consultantShare='',bool negotiable=false,
+    String sellerName='',String documentType='',String description='',String status='active',bool negotiable=false,
   }) async {
     num? n(String s)=>num.tryParse(s.replaceAll(',','').trim());
     final values=<String,dynamic>{
@@ -77,14 +124,14 @@ class AmlakSupabase {
       'price':n(price),'deposit':n(deposit),'monthly_rent':n(monthlyRent),
       'bedrooms':int.tryParse(bedrooms),'building_age':int.tryParse(buildingAge),
       'parking':parking,'elevator':elevator,'storage':storage,'features':features,'phone':phone,
-      'seller_name':sellerName,'document_type':documentType,'description':description,'status':status,'commission_amount':n(commissionAmount),'consultant_share':n(consultantShare),'negotiable':negotiable,
+      'seller_name':sellerName,'document_type':documentType,'description':description,'status':status,'negotiable':negotiable,
       'updated_at':DateTime.now().toUtc().toIso8601String(),
     };
     final Map<String,dynamic> saved;
     if(id==null) {
-      saved=Map<String,dynamic>.from(await client.from('properties').insert({...values,'owner_id':uid,'assigned_to':uid}).select().single());
+      saved=Map<String,dynamic>.from(await client.from('properties').insert({...values,'owner_id':uid,'assigned_to':uid}).select(propertySelect).single());
     } else {
-      saved=Map<String,dynamic>.from(await client.from('properties').update(values).eq('id',id).select().single());
+      saved=Map<String,dynamic>.from(await client.from('properties').update(values).eq('id',id).select(propertySelect).single());
     }
     final cached=await _readCache('properties');
     final index=cached.indexWhere((row)=>row['id']==saved['id']);
@@ -115,12 +162,60 @@ class AmlakSupabase {
     await client.storage.from(bucket).remove([path]);
     await client.from('property_images').delete().eq('id',imageId);
   }
-  static Future<String> loadPrivateNote(String propertyId) async {
-    final row=await client.from('property_private_notes').select('note').eq('property_id',propertyId).maybeSingle();
-    return row?['note']?.toString()??'';
+  static Future<Map<String,dynamic>> loadPrivateData(String propertyId) async {
+    final row = await client.from('property_private_notes')
+        .select('note').eq('property_id', propertyId).maybeSingle();
+    return {'private_note': row?['note']?.toString() ?? ''};
   }
+  static Future<String> loadPrivateNote(String propertyId) async =>
+      (await loadPrivateData(propertyId))['private_note']?.toString() ?? '';
+
   static Future<void> savePrivateNote(String propertyId,String note) async {
-    await client.from('property_private_notes').upsert({'property_id':propertyId,'note':note,'updated_at':DateTime.now().toUtc().toIso8601String()});
+    await client.from('property_private_notes').upsert({
+      'property_id':propertyId,
+      'note':note,
+      'updated_at':DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  static Future<Map<String,dynamic>> loadManagerFinancials(String propertyId) async {
+    final row = await client.from('property_manager_financials')
+        .select('commission_amount,consultant_share')
+        .eq('property_id', propertyId).maybeSingle();
+    return {
+      'commission_amount': row?['commission_amount'],
+      'consultant_share': row?['consultant_share'],
+    };
+  }
+
+  static Future<void> saveManagerFinancials(
+    String propertyId, {
+    required String commissionAmount,
+    required String consultantShare,
+  }) async {
+    final profileRow = await profile();
+    if (profileRow['role'] != 'manager' || profileRow['is_active'] != true) {
+      throw const AuthException('ثبت اطلاعات مالی فقط برای مدیر فعال مجاز است.');
+    }
+    num? parse(String value) => num.tryParse(value.replaceAll(',', '').trim());
+    await client.from('property_manager_financials').upsert({
+      'property_id': propertyId,
+      'commission_amount': parse(commissionAmount),
+      'consultant_share': parse(consultantShare),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  static Future<void> setCanViewOtherProperties(String consultantId, bool value) async {
+    await client.from('profiles').update({
+      'can_view_other_properties': value,
+    }).eq('id', consultantId);
+  }
+
+  static Future<void> setConsultantActive(String consultantId, bool value) async {
+    await client.from('profiles').update({
+      'is_active': value,
+    }).eq('id', consultantId);
   }
   static Future<List<Map<String,dynamic>>> loadPropertyAccess(String propertyId) async =>
       List<Map<String,dynamic>>.from(await client.from('property_access').select().eq('property_id',propertyId));
