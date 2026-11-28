@@ -107,15 +107,18 @@ class _PropertiesPageState extends State<PropertiesPage>{
   void _error(Object e)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('خطا: $e')));
   List<Map<String,dynamic>> get filtered=>rows.where((p){final text='${p['title']} ${p['address']} ${p['neighborhood']} ${p['phone']} ${p['file_code']}'.toLowerCase();final price=_num(p['price'])??0,area=_num(p['area'])??0;final loP=_num(minPrice.text),hiP=_num(maxPrice.text),loA=_num(minArea.text),hiA=_num(maxArea.text);return text.contains(query.toLowerCase())&&(deal=='همه'||p['deal_type']==deal)&&(kind=='همه'||p['property_type']==kind)&&(loP==null||price>=loP)&&(hiP==null||price<=hiP)&&(loA==null||area>=loA)&&(hiA==null||area<=hiA);}).toList();
   Future<void> edit([Map<String,dynamic>? p])async{
-    if(p!=null&&!canManageProperty(p)){_error(Exception('فقط مالک فایل یا مدیر می‌تواند آن را ویرایش کند.'));return;}
+    final isManagerNow=await AmlakSupabase.isManager();
+    currentUserId=AmlakSupabase.uid;
+    if(mounted)setState(()=>manager=isManagerNow);
+    if(p!=null&&!(isManagerNow||p['owner_id']?.toString()==currentUserId)){_error(Exception('فقط مالک فایل یا مدیر می‌تواند آن را ویرایش کند.'));return;}
     final initial=p==null?null:Map<String,dynamic>.from(p);
     if(initial!=null){
       try{
         initial.addAll(await AmlakSupabase.loadPrivateData(initial['id'].toString()));
-        if(manager)initial.addAll(await AmlakSupabase.loadManagerFinancials(initial['id'].toString()));
+        if(isManagerNow)initial.addAll(await AmlakSupabase.loadManagerFinancials(initial['id'].toString()));
       }catch(e){_error(e);}
     }
-    final result=await showDialog<Map<String,dynamic>>(context:context,builder:(_)=>PropertyForm(initial:initial,manager:manager));
+    final result=await showDialog<Map<String,dynamic>>(context:context,builder:(_)=>PropertyForm(initial:initial,manager:isManagerNow));
     if(result==null)return;
     try{
       final saved=await AmlakSupabase.saveProperty(
@@ -130,7 +133,7 @@ class _PropertiesPageState extends State<PropertiesPage>{
         description:result['description'],status:result['status'],negotiable:result['negotiable'],
       );
       await AmlakSupabase.savePrivateNote(saved['id'].toString(),result['private_note']??'');
-      if(manager){
+      if(isManagerNow){
         await AmlakSupabase.saveManagerFinancials(
           saved['id'].toString(),
           commissionAmount:result['commission_amount']??'',
@@ -146,7 +149,8 @@ class _PropertiesPageState extends State<PropertiesPage>{
   }
 
   Future<void> remove(Map<String,dynamic> p)async{
-    if(!canManageProperty(p)){_error(Exception('فقط مالک فایل یا مدیر می‌تواند آن را حذف کند.'));return;}
+    final isManagerNow=await AmlakSupabase.isManager();
+    if(!(isManagerNow||p['owner_id']?.toString()==AmlakSupabase.uid)){_error(Exception('فقط مالک فایل یا مدیر می‌تواند آن را حذف کند.'));return;}
     try{await AmlakSupabase.deleteRow('properties',p['id'].toString());setState(()=>rows.remove(p));}
     catch(e){_error(e);}
   }
