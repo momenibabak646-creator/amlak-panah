@@ -7,6 +7,7 @@ import 'package:tesseract_ocr/ocr_engine_config.dart';
 import 'ocr_parser.dart';
 import 'brand_logo.dart';
 import 'supabase_service.dart';
+import 'property_permissions.dart';
 
 const gold = Color(0xFFB58A35);
 const kinds = ['آپارتمان','خانه و ویلا','زمین','مغازه','دفتر کار'];
@@ -102,7 +103,7 @@ class _PropertiesPageState extends State<PropertiesPage>{
 
   @override void initState(){super.initState();load();}
   Future<void> load()async{try{final me=await AmlakSupabase.profile();manager=me['role']=='manager'&&me['is_active']==true;currentUserId=AmlakSupabase.uid;final r=await AmlakSupabase.loadProperties();if(mounted)setState(()=>rows=r);}catch(e){_error(e);}finally{if(mounted)setState(()=>loading=false);}}
-  bool canManageProperty(Map<String,dynamic> p)=>manager||p['owner_id']?.toString()==currentUserId;
+  bool canManageProperty(Map<String,dynamic> p)=>canEditProperty(manager:manager,currentUserId:currentUserId,ownerId:p['owner_id']?.toString());
   void _error(Object e)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('خطا: $e')));
   List<Map<String,dynamic>> get filtered=>rows.where((p){final text='${p['title']} ${p['address']} ${p['neighborhood']} ${p['phone']} ${p['file_code']}'.toLowerCase();final price=_num(p['price'])??0,area=_num(p['area'])??0;final loP=_num(minPrice.text),hiP=_num(maxPrice.text),loA=_num(minArea.text),hiA=_num(maxArea.text);return text.contains(query.toLowerCase())&&(deal=='همه'||p['deal_type']==deal)&&(kind=='همه'||p['property_type']==kind)&&(loP==null||price>=loP)&&(hiP==null||price<=hiP)&&(loA==null||area>=loA)&&(hiA==null||area<=hiA);}).toList();
   Future<void> edit([Map<String,dynamic>? p])async{
