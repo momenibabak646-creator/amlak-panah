@@ -35,6 +35,19 @@ BEGIN
   IF NOT has_table_privilege('authenticated', 'public.property_manager_financials', 'SELECT') THEN
     RAISE EXCEPTION 'manager financial table grant is missing';
   END IF;
+
+  IF (SELECT column_default FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='profiles' AND column_name='is_active') <> 'false' THEN
+    RAISE EXCEPTION 'new profile default must be inactive';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public' AND tablename='profiles'
+      AND policyname='profile read' AND cmd='SELECT'
+      AND qual LIKE '%auth.uid%'
+  ) THEN
+    RAISE EXCEPTION 'profile self-read policy is missing';
+  END IF;
 END
 $$;
 
