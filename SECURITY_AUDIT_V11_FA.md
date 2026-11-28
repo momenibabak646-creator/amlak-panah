@@ -28,7 +28,7 @@
 | SELECT/INSERT جدول backup_restore_runs | فعال، با RLS |
 | جدول property_manager_financials | فعال، با RLS مدیر فعال |
 
-اسکریپت `supabase/tests/security_privileges.sql` روی پروژه زنده اجرا شد و بدون خطا تمام کنترل‌ها را گذراند. پس از کشف اینکه جدول تازه‌ساخته‌شده `property_manager_financials` مجوز پیش‌فرض `TRUNCATE` گرفته بود، مهاجرت سوم اعمال شد؛ بررسی نهایی روی هر ۱۰ جدول عمومی صفر مجوز `TRUNCATE` برای هر دو نقش نشان داد.
+اسکریپت `supabase/tests/security_privileges.sql` روی پروژه زنده اجرا شد و بدون خطا تمام کنترل‌ها را گذراند. پس از کشف اینکه جدول تازه‌ساخته‌شده `property_manager_financials` مجوز پیش‌فرض `TRUNCATE` گرفته بود، مهاجرت سوم اعمال شد؛ بررسی نهایی روی هر ۱۰ جدول عمومی صفر مجوز `TRUNCATE`، `TRIGGER` و `REFERENCES` برای هر دو نقش نشان داد.
 
 ## آزمون نشست مدیر
 با شناسه مدیر موجود، یک تراکنش آزمایشی با نقش `authenticated` اجرا شد:
